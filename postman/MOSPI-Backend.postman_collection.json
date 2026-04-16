@@ -1,0 +1,586 @@
+{
+  "info": {
+    "name": "MOSPI Backend",
+    "description": "All endpoints for the MOSPI backend (Node + Express + Postgres). Import together with the 'MOSPI Local' environment.\n\nAfter calling **Auth → Register** or **Auth → Login**, the access & refresh tokens are auto-saved to the environment. All protected requests pick them up via `{{accessToken}}`.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "b1c2d3e4-0000-4000-8000-000000000001"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }]
+  },
+  "event": [],
+  "variable": [],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Liveness",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/health", "host": ["{{baseUrl}}"], "path": ["health"] }
+          }
+        },
+        {
+          "name": "Readiness (DB check)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/health/ready", "host": ["{{baseUrl}}"], "path": ["health", "ready"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res && res.data) {",
+                  "  if (res.data.accessToken) pm.environment.set('accessToken', res.data.accessToken);",
+                  "  if (res.data.refreshToken) pm.environment.set('refreshToken', res.data.refreshToken);",
+                  "  if (res.data.user && res.data.user.id) pm.environment.set('userId', res.data.user.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Admin User\",\n  \"email\": \"admin@mospi.gov.in\",\n  \"password\": \"Admin@12345\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/register", "host": ["{{baseUrl}}"], "path": ["auth", "register"] }
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res && res.data) {",
+                  "  if (res.data.accessToken) pm.environment.set('accessToken', res.data.accessToken);",
+                  "  if (res.data.refreshToken) pm.environment.set('refreshToken', res.data.refreshToken);",
+                  "  if (res.data.user && res.data.user.id) pm.environment.set('userId', res.data.user.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@mospi.gov.in\",\n  \"password\": \"Admin@12345\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] }
+          }
+        },
+        {
+          "name": "Refresh token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res && res.data) {",
+                  "  if (res.data.accessToken) pm.environment.set('accessToken', res.data.accessToken);",
+                  "  if (res.data.refreshToken) pm.environment.set('refreshToken', res.data.refreshToken);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/refresh", "host": ["{{baseUrl}}"], "path": ["auth", "refresh"] }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/logout", "host": ["{{baseUrl}}"], "path": ["auth", "logout"] }
+          }
+        },
+        {
+          "name": "Me (protected)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/auth/me", "host": ["{{baseUrl}}"], "path": ["auth", "me"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Banners",
+      "item": [
+        {
+          "name": "List banners",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/banners", "host": ["{{baseUrl}}"], "path": ["banners"] }
+          }
+        },
+        {
+          "name": "Get banner by id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/banners/{{bannerId}}", "host": ["{{baseUrl}}"], "path": ["banners", "{{bannerId}}"] }
+          }
+        },
+        {
+          "name": "Create banner",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res && res.data && res.data.id) pm.environment.set('bannerId', res.data.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Title\",\n  \"subtitle\": \"subtitle\",\n  \"bannerType\": \"home\",\n  \"bannerFor\": \"admins\",\n  \"redirectUrl\": \"https://localhost5173/admin/system-setting/slider\",\n  \"startDate\": \"2026-04-18\",\n  \"endDate\": \"2026-04-24\",\n  \"order\": 3,\n  \"status\": \"active\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/banners", "host": ["{{baseUrl}}"], "path": ["banners"] }
+          }
+        },
+        {
+          "name": "Update banner",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Updated Title\",\n  \"status\": \"inactive\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/banners/{{bannerId}}", "host": ["{{baseUrl}}"], "path": ["banners", "{{bannerId}}"] }
+          }
+        },
+        {
+          "name": "Delete banner",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/banners/{{bannerId}}", "host": ["{{baseUrl}}"], "path": ["banners", "{{bannerId}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Sectors",
+      "item": [
+        {
+          "name": "List sectors",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/sectors", "host": ["{{baseUrl}}"], "path": ["sectors"] }
+          }
+        },
+        {
+          "name": "Get sector by id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/sectors/{{sectorId}}", "host": ["{{baseUrl}}"], "path": ["sectors", "{{sectorId}}"] }
+          }
+        },
+        {
+          "name": "Create sector (multipart with icon)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res && res.data && res.data.id) pm.environment.set('sectorId', res.data.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "name", "value": "sector name", "type": "text" },
+                { "key": "title", "value": "title", "type": "text" },
+                { "key": "subtitle", "value": "subtitle", "type": "text" },
+                { "key": "hoverTitle", "value": "hover title", "type": "text" },
+                { "key": "sectorSlug", "value": "sector-name", "type": "text" },
+                { "key": "cardColor", "value": "#8b5cf6", "type": "text" },
+                { "key": "iconColor", "value": "#884e4e", "type": "text" },
+                { "key": "order", "value": "2", "type": "text" },
+                { "key": "status", "value": "active", "type": "text" },
+                { "key": "icon", "type": "file", "src": [], "description": "Select any image file" }
+              ]
+            },
+            "url": { "raw": "{{baseUrl}}/sectors", "host": ["{{baseUrl}}"], "path": ["sectors"] }
+          }
+        },
+        {
+          "name": "Update sector (multipart)",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "name", "value": "updated sector name", "type": "text" },
+                { "key": "status", "value": "active", "type": "text" },
+                { "key": "icon", "type": "file", "src": [], "description": "Optional — only attach to replace" }
+              ]
+            },
+            "url": { "raw": "{{baseUrl}}/sectors/{{sectorId}}", "host": ["{{baseUrl}}"], "path": ["sectors", "{{sectorId}}"] }
+          }
+        },
+        {
+          "name": "Delete sector",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/sectors/{{sectorId}}", "host": ["{{baseUrl}}"], "path": ["sectors", "{{sectorId}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Categories",
+      "item": [
+        {
+          "name": "List categories",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/categories", "host": ["{{baseUrl}}"], "path": ["categories"] }
+          }
+        },
+        {
+          "name": "List by sector",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/categories?sectorId={{sectorId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["categories"],
+              "query": [{ "key": "sectorId", "value": "{{sectorId}}" }]
+            }
+          }
+        },
+        {
+          "name": "Get category by id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/categories/{{categoryId}}", "host": ["{{baseUrl}}"], "path": ["categories", "{{categoryId}}"] }
+          }
+        },
+        {
+          "name": "Create category (multipart with categoryIcon)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res && res.data && res.data.id) pm.environment.set('categoryId', res.data.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "sectorId", "value": "{{sectorId}}", "type": "text" },
+                { "key": "name", "value": "category name", "type": "text" },
+                { "key": "description", "value": "category description", "type": "text" },
+                { "key": "hoverTitle", "value": "category hover title", "type": "text" },
+                { "key": "categorySlug", "value": "category-name", "type": "text" },
+                { "key": "cardColor", "value": "#06b6d4", "type": "text" },
+                { "key": "iconColor", "value": "#3a1313", "type": "text" },
+                { "key": "displayStatus", "value": "show", "type": "text" },
+                { "key": "order", "value": "13", "type": "text" },
+                { "key": "status", "value": "active", "type": "text" },
+                { "key": "categoryIcon", "type": "file", "src": [], "description": "Select any image file" }
+              ]
+            },
+            "url": { "raw": "{{baseUrl}}/categories", "host": ["{{baseUrl}}"], "path": ["categories"] }
+          }
+        },
+        {
+          "name": "Update category (multipart)",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "name", "value": "updated category name", "type": "text" },
+                { "key": "categoryIcon", "type": "file", "src": [], "description": "Optional" }
+              ]
+            },
+            "url": { "raw": "{{baseUrl}}/categories/{{categoryId}}", "host": ["{{baseUrl}}"], "path": ["categories", "{{categoryId}}"] }
+          }
+        },
+        {
+          "name": "Delete category",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/categories/{{categoryId}}", "host": ["{{baseUrl}}"], "path": ["categories", "{{categoryId}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Indicators",
+      "item": [
+        {
+          "name": "List indicators",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/indicators", "host": ["{{baseUrl}}"], "path": ["indicators"] }
+          }
+        },
+        {
+          "name": "List by sector + category",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/indicators?sectorId={{sectorId}}&categoryId={{categoryId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["indicators"],
+              "query": [
+                { "key": "sectorId", "value": "{{sectorId}}" },
+                { "key": "categoryId", "value": "{{categoryId}}" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get indicator by id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/indicators/{{indicatorId}}", "host": ["{{baseUrl}}"], "path": ["indicators", "{{indicatorId}}"] }
+          }
+        },
+        {
+          "name": "Create indicator (multipart with indicatorIcon)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res && res.data && res.data.id) pm.environment.set('indicatorId', res.data.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "sectorId", "value": "{{sectorId}}", "type": "text" },
+                { "key": "categoryId", "value": "{{categoryId}}", "type": "text" },
+                { "key": "name", "value": "indicator name", "type": "text" },
+                { "key": "hoverTitle", "value": "hover title indicator", "type": "text" },
+                { "key": "cardColor", "value": "#8b5cf6", "type": "text" },
+                { "key": "iconColor", "value": "#921111", "type": "text" },
+                { "key": "order", "value": "1", "type": "text" },
+                { "key": "status", "value": "active", "type": "text" },
+                { "key": "indicatorIcon", "type": "file", "src": [], "description": "Select any image file" }
+              ]
+            },
+            "url": { "raw": "{{baseUrl}}/indicators", "host": ["{{baseUrl}}"], "path": ["indicators"] }
+          }
+        },
+        {
+          "name": "Update indicator (multipart)",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "name", "value": "updated indicator name", "type": "text" },
+                { "key": "indicatorIcon", "type": "file", "src": [], "description": "Optional" }
+              ]
+            },
+            "url": { "raw": "{{baseUrl}}/indicators/{{indicatorId}}", "host": ["{{baseUrl}}"], "path": ["indicators", "{{indicatorId}}"] }
+          }
+        },
+        {
+          "name": "Delete indicator",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/indicators/{{indicatorId}}", "host": ["{{baseUrl}}"], "path": ["indicators", "{{indicatorId}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "KPIs",
+      "item": [
+        {
+          "name": "List KPIs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/kpis", "host": ["{{baseUrl}}"], "path": ["kpis"] }
+          }
+        },
+        {
+          "name": "List by indicator",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/kpis?indicatorId={{indicatorId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["kpis"],
+              "query": [{ "key": "indicatorId", "value": "{{indicatorId}}" }]
+            }
+          }
+        },
+        {
+          "name": "Get KPI by id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/kpis/{{kpiId}}", "host": ["{{baseUrl}}"], "path": ["kpis", "{{kpiId}}"] }
+          }
+        },
+        {
+          "name": "Create KPI (multipart with KpiIcon)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res && res.data && res.data.id) pm.environment.set('kpiId', res.data.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "sectorId", "value": "{{sectorId}}", "type": "text" },
+                { "key": "categoryId", "value": "{{categoryId}}", "type": "text" },
+                { "key": "indicatorId", "value": "{{indicatorId}}", "type": "text" },
+                { "key": "name", "value": "KPI name", "type": "text" },
+                { "key": "kpiSlug", "value": "kpi-name", "type": "text" },
+                { "key": "description", "value": "kpi description", "type": "text" },
+                { "key": "note", "value": "this is the note inside KPI", "type": "text" },
+                { "key": "hoverTitle", "value": "kpi hover title", "type": "text" },
+                { "key": "dataSource", "value": "Data Source 1 National Statistics Office", "type": "text" },
+                { "key": "visualizationUrl", "value": "https://example.com/visualization/1", "type": "text" },
+                { "key": "cardColor", "value": "#10b981", "type": "text" },
+                { "key": "iconColor", "value": "#f55656", "type": "text" },
+                { "key": "value1", "value": "50000", "type": "text" },
+                { "key": "value2", "value": "344343", "type": "text" },
+                { "key": "value3", "value": "43455543", "type": "text" },
+                { "key": "showValue1", "value": "false", "type": "text" },
+                { "key": "showValue2", "value": "true", "type": "text" },
+                { "key": "showValue3", "value": "true", "type": "text" },
+                { "key": "displayStatus", "value": "show", "type": "text" },
+                { "key": "order", "value": "4", "type": "text" },
+                { "key": "status", "value": "active", "type": "text" },
+                { "key": "KpiIcon", "type": "file", "src": [], "description": "Select any image file" }
+              ]
+            },
+            "url": { "raw": "{{baseUrl}}/kpis", "host": ["{{baseUrl}}"], "path": ["kpis"] }
+          }
+        },
+        {
+          "name": "Update KPI (multipart)",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "name", "value": "updated KPI name", "type": "text" },
+                { "key": "value1", "value": "99999", "type": "text" },
+                { "key": "KpiIcon", "type": "file", "src": [], "description": "Optional" }
+              ]
+            },
+            "url": { "raw": "{{baseUrl}}/kpis/{{kpiId}}", "host": ["{{baseUrl}}"], "path": ["kpis", "{{kpiId}}"] }
+          }
+        },
+        {
+          "name": "Delete KPI",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/kpis/{{kpiId}}", "host": ["{{baseUrl}}"], "path": ["kpis", "{{kpiId}}"] }
+          }
+        }
+      ]
+    }
+  ]
+}
