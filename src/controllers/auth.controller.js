@@ -5,17 +5,16 @@ import { query } from '../config/db.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
 // --- token helpers ---------------------------------------------------------
-const signAccess = (userId) =>
-  jwt.sign({ sub: userId }, process.env.JWT_ACCESS_SECRET, {
+const signAccess = (userId, role) =>
+  jwt.sign({ sub: userId, role }, process.env.JWT_ACCESS_SECRET, {
     expiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '15m',
   });
 
-const signRefresh = (userId) =>
-  jwt.sign({ sub: userId }, process.env.JWT_REFRESH_SECRET, {
+const signRefresh = (userId, role) =>
+  jwt.sign({ sub: userId, role }, process.env.JWT_REFRESH_SECRET, {
     expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
   });
 
-// Convert "7d" / "15m" / "30s" → milliseconds so we can store absolute expiry.
 const ttlToMs = (ttl) => {
   const m = /^(\d+)([smhd])$/.exec(ttl || '');
   if (!m) return 0;
@@ -25,10 +24,9 @@ const ttlToMs = (ttl) => {
 
 const sha256 = (v) => crypto.createHash('sha256').update(v).digest('hex');
 
-// Issue a new pair and persist the refresh-token hash.
-const issueTokens = async (userId) => {
-  const accessToken = signAccess(userId);
-  const refreshToken = signRefresh(userId);
+const issueTokens = async (userId, role) => {
+  const accessToken = signAccess(userId, role);
+  const refreshToken = signRefresh(userId, role);
   const expiresAt = new Date(
     Date.now() + ttlToMs(process.env.JWT_REFRESH_EXPIRES_IN || '7d'),
   );
@@ -41,6 +39,9 @@ const issueTokens = async (userId) => {
 };
 
 // --- controllers -----------------------------------------------------------
+
+// Public registration — always creates role "user".
+// Only an admin can upgrade someone's role later.
 export const register = asyncHandler(async (req, res) => {
   const { name, email, password } = req.body;
   if (!name || !email || !password) {
@@ -56,14 +57,14 @@ export const register = asyncHandler(async (req, res) => {
 
   const hash = await bcrypt.hash(password, 10);
   const { rows } = await query(
-    `INSERT INTO users (name, email, password)
-     VALUES ($1, $2, $3)
-     RETURNING id, name, email, created_at`,
+    `INSERT INTO users (name, email, password, role)
+     VALUES ($1, $2, $3, 'user')
+     RETURNING id, name, email, role, created_at`,
     [name, email, hash],
   );
 
   const user = rows[0];
-  const tokens = await issueTokens(user.id);
+  const tokens = await issueTokens(user.id, user.role);
   res.status(201).json({ success: true, data: { user, ...tokens } });
 });
 
@@ -74,7 +75,7 @@ export const login = asyncHandler(async (req, res) => {
   }
 
   const { rows } = await query(
-    'SELECT id, name, email, password FROM users WHERE email = $1',
+    'SELECT id, name, email, password, role FROM users WHERE email = $1',
     [email],
   );
   const user = rows[0];
@@ -82,20 +83,16 @@ export const login = asyncHandler(async (req, res) => {
     return res.status(401).json({ success: false, message: 'Invalid credentials' });
   }
 
-  const tokens = await issueTokens(user.id);
+  const tokens = await issueTokens(user.id, user.role);
   res.json({
     success: true,
     data: {
-      user: { id: user.id, name: user.name, email: user.email },
+      user: { id: user.id, name: user.name, email: user.email, role: user.role },
       ...tokens,
     },
   });
 });
 
-// POST /api/auth/refresh  body: { refreshToken }
-// - Verifies the JWT signature + expiry
-// - Checks the hash exists in DB and isn't revoked (defeats reuse of old copies)
-// - Rotates: old token is revoked, a new pair is issued
 export const refresh = asyncHandler(async (req, res) => {
   const { refreshToken } = req.body;
   if (!refreshToken) {
@@ -118,8 +115,6 @@ export const refresh = asyncHandler(async (req, res) => {
     [tokenHash],
   );
   if (!rows[0]) {
-    // Token verifies but was revoked or unknown — possible replay. Wipe all
-    // sessions for this user as a safety measure.
     await query(
       `UPDATE refresh_tokens SET revoked_at = NOW()
         WHERE user_id = $1 AND revoked_at IS NULL`,
@@ -128,13 +123,15 @@ export const refresh = asyncHandler(async (req, res) => {
     return res.status(401).json({ success: false, message: 'Refresh token not recognised' });
   }
 
-  // Rotate — revoke the used one, issue a fresh pair.
+  // Get fresh role from DB (in case admin changed it since last login)
+  const userResult = await query('SELECT role FROM users WHERE id = $1', [payload.sub]);
+  const currentRole = userResult.rows[0]?.role || 'user';
+
   await query(`UPDATE refresh_tokens SET revoked_at = NOW() WHERE id = $1`, [rows[0].id]);
-  const tokens = await issueTokens(payload.sub);
+  const tokens = await issueTokens(payload.sub, currentRole);
   res.json({ success: true, data: tokens });
 });
 
-// POST /api/auth/logout  body: { refreshToken }
 export const logout = asyncHandler(async (req, res) => {
   const { refreshToken } = req.body;
   if (refreshToken) {
@@ -147,9 +144,39 @@ export const logout = asyncHandler(async (req, res) => {
 
 export const me = asyncHandler(async (req, res) => {
   const { rows } = await query(
-    'SELECT id, name, email, created_at FROM users WHERE id = $1',
+    'SELECT id, name, email, role, created_at FROM users WHERE id = $1',
     [req.user.id],
   );
   if (!rows[0]) return res.status(404).json({ success: false, message: 'User not found' });
   res.json({ success: true, data: { user: rows[0] } });
+});
+
+// Admin-only: change a user's role
+export const updateUserRole = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { role } = req.body;
+
+  const allowed = ['user', 'officer', 'admin', 'super_admin'];
+  if (!role || !allowed.includes(role)) {
+    return res
+      .status(400)
+      .json({ success: false, message: `role must be one of: ${allowed.join(', ')}` });
+  }
+
+  const { rows, rowCount } = await query(
+    `UPDATE users SET role = $2 WHERE id = $1
+     RETURNING id, name, email, role, created_at`,
+    [id, role],
+  );
+  if (!rowCount) return res.status(404).json({ success: false, message: 'User not found' });
+
+  res.json({ success: true, data: { user: rows[0] } });
+});
+
+// Admin-only: list all users
+export const listUsers = asyncHandler(async (_req, res) => {
+  const { rows } = await query(
+    'SELECT id, name, email, role, created_at FROM users ORDER BY id ASC',
+  );
+  res.json({ success: true, data: rows });
 });

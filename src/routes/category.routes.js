@@ -7,13 +7,18 @@ import {
   deleteCategory,
 } from '../controllers/category.controller.js';
 import { upload } from '../middlewares/upload.js';
+import { protect } from '../middlewares/auth.js';
+import { authorize } from '../middlewares/authorize.js';
 
 const router = Router();
 
-router.get('/', listCategories);          // supports ?sectorId=
+// Public
+router.get('/', listCategories);
 router.get('/:id', getCategory);
-router.post('/', upload.single('categoryIcon'), createCategory);
-router.put('/:id', upload.single('categoryIcon'), updateCategory);
-router.delete('/:id', deleteCategory);
+
+// Protected — admin+ can manage
+router.post('/', protect, authorize('admin', 'super_admin'), upload.single('categoryIcon'), createCategory);
+router.put('/:id', protect, authorize('admin', 'super_admin'), upload.single('categoryIcon'), updateCategory);
+router.delete('/:id', protect, authorize('admin', 'super_admin'), deleteCategory);
 
 export default router;

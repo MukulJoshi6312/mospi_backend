@@ -7,13 +7,18 @@ import {
   deleteIndicator,
 } from '../controllers/indicator.controller.js';
 import { upload } from '../middlewares/upload.js';
+import { protect } from '../middlewares/auth.js';
+import { authorize } from '../middlewares/authorize.js';
 
 const router = Router();
 
-router.get('/', listIndicators);           // supports ?sectorId= &categoryId=
+// Public
+router.get('/', listIndicators);
 router.get('/:id', getIndicator);
-router.post('/', upload.single('indicatorIcon'), createIndicator);
-router.put('/:id', upload.single('indicatorIcon'), updateIndicator);
-router.delete('/:id', deleteIndicator);
+
+// Protected — admin+ can manage
+router.post('/', protect, authorize('admin', 'super_admin'), upload.single('indicatorIcon'), createIndicator);
+router.put('/:id', protect, authorize('admin', 'super_admin'), upload.single('indicatorIcon'), updateIndicator);
+router.delete('/:id', protect, authorize('admin', 'super_admin'), deleteIndicator);
 
 export default router;

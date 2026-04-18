@@ -6,13 +6,18 @@ import {
   updateBanner,
   deleteBanner,
 } from '../controllers/banner.controller.js';
+import { protect } from '../middlewares/auth.js';
+import { authorize } from '../middlewares/authorize.js';
 
 const router = Router();
 
+// Public — anyone can view
 router.get('/', listBanners);
 router.get('/:id', getBanner);
-router.post('/', createBanner);
-router.put('/:id', updateBanner);
-router.delete('/:id', deleteBanner);
+
+// Protected — admin+ can create/update/delete
+router.post('/', protect, authorize('admin', 'super_admin'), createBanner);
+router.put('/:id', protect, authorize('admin', 'super_admin'), updateBanner);
+router.delete('/:id', protect, authorize('admin', 'super_admin'), deleteBanner);
 
 export default router;

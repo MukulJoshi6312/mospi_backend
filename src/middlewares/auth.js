@@ -10,7 +10,7 @@ export const protect = (req, res, next) => {
 
   try {
     const payload = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
-    req.user = { id: payload.sub };
+    req.user = { id: payload.sub, role: payload.role };
     next();
   } catch (err) {
     const message =
