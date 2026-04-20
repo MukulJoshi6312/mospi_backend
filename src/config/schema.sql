@@ -18,6 +18,23 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 -- ============================================================================
+--  COMPANIES (System Setting → Company)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS companies (
+  id               SERIAL PRIMARY KEY,
+  domain           VARCHAR(255) NOT NULL,
+  company_name     VARCHAR(200) NOT NULL,
+  copyright        VARCHAR(200) NOT NULL,
+  left_logo        TEXT,
+  right_logo       TEXT,
+  meta_title       VARCHAR(150) NOT NULL,
+  meta_description TEXT         NOT NULL,
+  status           VARCHAR(20)  NOT NULL DEFAULT 'active',
+  created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  updated_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+-- ============================================================================
 --  REFRESH TOKENS
 --  Stored as SHA-256 hashes so a DB leak doesn't expose usable tokens.
 -- ============================================================================
