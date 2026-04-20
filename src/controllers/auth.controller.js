@@ -3,6 +3,18 @@ import jwt from 'jsonwebtoken';
 import crypto from 'node:crypto';
 import { query } from '../config/db.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
+import { fileUrl } from '../middlewares/upload.js';
+
+// SELECT clause that maps DB columns → camelCase for the user response.
+const USER_FIELDS = `
+  id, name, email, role,
+  profile_picture AS "profilePicture",
+  phone, gender,
+  TO_CHAR(date_of_birth, 'YYYY-MM-DD') AS "dateOfBirth",
+  address, bio,
+  created_at AS "createdAt",
+  updated_at AS "updatedAt"
+`;
 
 // --- token helpers ---------------------------------------------------------
 const signAccess = (userId, role) =>
@@ -144,10 +156,62 @@ export const logout = asyncHandler(async (req, res) => {
 
 export const me = asyncHandler(async (req, res) => {
   const { rows } = await query(
-    'SELECT id, name, email, role, created_at FROM users WHERE id = $1',
+    `SELECT ${USER_FIELDS} FROM users WHERE id = $1`,
     [req.user.id],
   );
   if (!rows[0]) return res.status(404).json({ success: false, message: 'User not found' });
+  res.json({ success: true, data: { user: rows[0] } });
+});
+
+// PUT /api/auth/me  (multipart/form-data; file field: profilePicture)
+// The logged-in user updates their own profile. email and role are ignored
+// even if sent — those must go through the admin role endpoint.
+export const updateProfile = asyncHandler(async (req, res) => {
+  const { name, phone, gender, dateOfBirth, address, bio } = req.body;
+
+  if (!name || !phone || !gender || !dateOfBirth) {
+    return res.status(400).json({
+      success: false,
+      message: 'name, phone, gender and dateOfBirth are required',
+    });
+  }
+
+  const allowedGenders = ['male', 'female', 'other'];
+  if (!allowedGenders.includes(gender)) {
+    return res.status(400).json({
+      success: false,
+      message: `gender must be one of: ${allowedGenders.join(', ')}`,
+    });
+  }
+
+  // Only replace profile picture if a new file was uploaded.
+  const profilePicture = fileUrl(req);
+
+  const { rows, rowCount } = await query(
+    `UPDATE users SET
+       name            = $2,
+       phone           = $3,
+       gender          = $4,
+       date_of_birth   = $5,
+       address         = $6,
+       bio             = $7,
+       profile_picture = COALESCE($8, profile_picture),
+       updated_at      = NOW()
+     WHERE id = $1
+     RETURNING ${USER_FIELDS}`,
+    [
+      req.user.id,
+      name,
+      phone,
+      gender,
+      dateOfBirth,
+      address || null,
+      bio || null,
+      profilePicture,
+    ],
+  );
+  if (!rowCount) return res.status(404).json({ success: false, message: 'User not found' });
+
   res.json({ success: true, data: { user: rows[0] } });
 });
 
