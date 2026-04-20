@@ -237,6 +237,58 @@ export const updateUserRole = asyncHandler(async (req, res) => {
   res.json({ success: true, data: { user: rows[0] } });
 });
 
+// PUT /api/auth/change-password — logged-in user changes own password
+export const changePassword = asyncHandler(async (req, res) => {
+  // Accept common field name variants from frontend
+  const currentPassword = req.body.currentPassword || req.body.oldPassword || req.body.password;
+  const newPassword = req.body.newPassword;
+
+  if (!currentPassword || !newPassword) {
+    return res
+      .status(400)
+      .json({ success: false, message: 'currentPassword and newPassword are required' });
+  }
+
+  if (newPassword.length < 8) {
+    return res
+      .status(400)
+      .json({ success: false, message: 'New password must be at least 8 characters' });
+  }
+
+  if (currentPassword === newPassword) {
+    return res
+      .status(400)
+      .json({ success: false, message: 'New password must be different from current password' });
+  }
+
+  // Fetch the HASHED password from DB
+  const userResult = await query('SELECT password FROM users WHERE id = $1', [req.user.id]);
+  if (!userResult.rows[0]) {
+    return res.status(404).json({ success: false, message: 'User not found' });
+  }
+
+  const storedHash = userResult.rows[0].password;
+  const isMatch = await bcrypt.compare(currentPassword, storedHash);
+
+  if (!isMatch) {
+    return res.status(401).json({ success: false, message: 'Current password is incorrect' });
+  }
+
+  const newHash = await bcrypt.hash(newPassword, 10);
+  await query('UPDATE users SET password = $2, updated_at = NOW() WHERE id = $1', [
+    req.user.id,
+    newHash,
+  ]);
+
+  // Revoke all refresh tokens so user must re-login on other devices
+  await query(
+    `UPDATE refresh_tokens SET revoked_at = NOW() WHERE user_id = $1 AND revoked_at IS NULL`,
+    [req.user.id],
+  );
+
+  res.json({ success: true, message: 'Password changed successfully' });
+});
+
 // Admin-only: list all users
 export const listUsers = asyncHandler(async (_req, res) => {
   const { rows } = await query(

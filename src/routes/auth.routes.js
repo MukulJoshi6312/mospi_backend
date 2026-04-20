@@ -6,6 +6,7 @@ import {
   logout,
   me,
   updateProfile,
+  changePassword,
   updateUserRole,
   listUsers,
 } from '../controllers/auth.controller.js';
@@ -25,6 +26,8 @@ router.post('/logout', logout);
 // Protected — any logged-in user (own profile)
 router.get('/me', protect, me);
 router.put('/me', protect, upload.single('profilePicture'), updateProfile);
+router.put('/change-password', protect, changePassword);
+router.post('/change-password', protect, changePassword);
 
 // Admin only — manage users
 router.get('/users', protect, authorize('admin', 'super_admin'), listUsers);
