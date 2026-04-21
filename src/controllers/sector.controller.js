@@ -1,5 +1,4 @@
 import { query } from '../config/db.js';
-import { fileUrl } from '../middlewares/upload.js';
 
 const SELECT = `
   SELECT id, name, title, subtitle,
@@ -44,6 +43,7 @@ export const createSector = async (req, res, next) => {
       sectorSlug,
       cardColor,
       iconColor,
+      icon,
       order = 0,
       status = 'active',
     } = req.body;
@@ -53,8 +53,6 @@ export const createSector = async (req, res, next) => {
         .status(400)
         .json({ success: false, message: 'name and sectorSlug are required' });
     }
-
-    const icon = fileUrl(req); // from multer; null if no file
 
     const { rows } = await query(
       `INSERT INTO sectors
@@ -85,12 +83,11 @@ export const updateSector = async (req, res, next) => {
       hoverTitle,
       sectorSlug,
       cardColor,
+      icon,
       iconColor,
       order,
       status,
     } = req.body;
-
-    const icon = fileUrl(req); // if a new file is uploaded, replace; else keep existing
 
     const { rowCount } = await query(
       `UPDATE sectors SET

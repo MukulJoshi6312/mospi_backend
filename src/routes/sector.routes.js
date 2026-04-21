@@ -6,7 +6,6 @@ import {
   updateSector,
   deleteSector,
 } from '../controllers/sector.controller.js';
-import { upload } from '../middlewares/upload.js';
 import { protect } from '../middlewares/auth.js';
 import { authorize } from '../middlewares/authorize.js';
 
@@ -17,8 +16,8 @@ router.get('/', listSectors);
 router.get('/:id', getSector);
 
 // Protected — admin+ can manage
-router.post('/', protect, authorize('admin', 'super_admin'), upload.single('icon'), createSector);
-router.put('/:id', protect, authorize('admin', 'super_admin'), upload.single('icon'), updateSector);
+router.post('/', protect, authorize('admin', 'super_admin'), createSector);
+router.put('/:id', protect, authorize('admin', 'super_admin'), updateSector);
 router.delete('/:id', protect, authorize('admin', 'super_admin'), deleteSector);
 
 export default router;
