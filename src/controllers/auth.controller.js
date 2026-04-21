@@ -36,6 +36,25 @@ const ttlToMs = (ttl) => {
 
 const sha256 = (v) => crypto.createHash('sha256').update(v).digest('hex');
 
+const COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
+  path: '/',
+  maxAge: ttlToMs(process.env.JWT_REFRESH_EXPIRES_IN || '7d'),
+};
+
+const setRefreshCookie = (res, token) =>
+  res.cookie('refreshToken', token, COOKIE_OPTIONS);
+
+const clearRefreshCookie = (res) =>
+  res.clearCookie('refreshToken', {
+    httpOnly: COOKIE_OPTIONS.httpOnly,
+    secure: COOKIE_OPTIONS.secure,
+    sameSite: COOKIE_OPTIONS.sameSite,
+    path: COOKIE_OPTIONS.path,
+  });
+
 const issueTokens = async (userId, role) => {
   const accessToken = signAccess(userId, role);
   const refreshToken = signRefresh(userId, role);
@@ -76,8 +95,9 @@ export const register = asyncHandler(async (req, res) => {
   );
 
   const user = rows[0];
-  const tokens = await issueTokens(user.id, user.role);
-  res.status(201).json({ success: true, data: { user, ...tokens } });
+  const { accessToken, refreshToken } = await issueTokens(user.id, user.role);
+  setRefreshCookie(res, refreshToken);
+  res.status(201).json({ success: true, data: { user, accessToken } });
 });
 
 export const login = asyncHandler(async (req, res) => {
@@ -95,20 +115,21 @@ export const login = asyncHandler(async (req, res) => {
     return res.status(401).json({ success: false, message: 'Invalid credentials' });
   }
 
-  const tokens = await issueTokens(user.id, user.role);
+  const { accessToken, refreshToken } = await issueTokens(user.id, user.role);
+  setRefreshCookie(res, refreshToken);
   res.json({
     success: true,
     data: {
       user: { id: user.id, name: user.name, email: user.email, role: user.role },
-      ...tokens,
+      accessToken,
     },
   });
 });
 
 export const refresh = asyncHandler(async (req, res) => {
-  const { refreshToken } = req.body;
+  const refreshToken = req.cookies?.refreshToken;
   if (!refreshToken) {
-    return res.status(400).json({ success: false, message: 'refreshToken required' });
+    return res.status(400).json({ success: false, message: 'refreshToken cookie required' });
   }
 
   let payload;
@@ -141,16 +162,18 @@ export const refresh = asyncHandler(async (req, res) => {
 
   await query(`UPDATE refresh_tokens SET revoked_at = NOW() WHERE id = $1`, [rows[0].id]);
   const tokens = await issueTokens(payload.sub, currentRole);
-  res.json({ success: true, data: tokens });
+  setRefreshCookie(res, tokens.refreshToken);
+  res.json({ success: true, data: { accessToken: tokens.accessToken } });
 });
 
 export const logout = asyncHandler(async (req, res) => {
-  const { refreshToken } = req.body;
+  const refreshToken = req.cookies?.refreshToken;
   if (refreshToken) {
     await query(`UPDATE refresh_tokens SET revoked_at = NOW() WHERE token_hash = $1`, [
       sha256(refreshToken),
     ]);
   }
+  clearRefreshCookie(res);
   res.json({ success: true, message: 'Logged out' });
 });
 

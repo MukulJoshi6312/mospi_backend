@@ -2,6 +2,7 @@ import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
 import compression from 'compression';
+import cookieParser from 'cookie-parser';
 import path from 'node:path';
 
 import routes from './routes/index.js';
@@ -31,6 +32,7 @@ app.use(
 app.use(compression());
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
 
 // --- Static: uploaded icons served at http://localhost:4000/uploads/<file> ---
 app.use('/uploads', express.static(path.resolve('uploads')));
