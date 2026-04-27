@@ -1,5 +1,4 @@
 import { query } from '../config/db.js';
-import { fileUrl } from '../middlewares/upload.js';
 
 const SELECT = `
   SELECT id,
@@ -9,7 +8,7 @@ const SELECT = `
          hover_title    AS "hoverTitle",
          card_color     AS "cardColor",
          icon_color     AS "iconColor",
-         indicator_icon AS "indicatorIcon",
+         indicator_icon AS "icon",
          display_order  AS "order",
          status,
          created_at     AS "createdAt",
@@ -64,6 +63,7 @@ export const createIndicator = async (req, res, next) => {
       hoverTitle,
       cardColor,
       iconColor,
+      icon,
       order = 0,
       status = 'active',
     } = req.body;
@@ -74,15 +74,13 @@ export const createIndicator = async (req, res, next) => {
         .json({ success: false, message: 'sectorId, categoryId and name are required' });
     }
 
-    const indicatorIcon = fileUrl(req);
-
     const { rows } = await query(
       `INSERT INTO indicators
          (sector_id, category_id, name, hover_title,
           card_color, icon_color, indicator_icon, display_order, status)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
        RETURNING id`,
-      [sectorId, categoryId, name, hoverTitle, cardColor, iconColor, indicatorIcon, order, status],
+      [sectorId, categoryId, name, hoverTitle, cardColor, iconColor, icon, order, status],
     );
 
     const created = await query(`${SELECT} WHERE id = $1`, [rows[0].id]);
@@ -107,11 +105,10 @@ export const updateIndicator = async (req, res, next) => {
       hoverTitle,
       cardColor,
       iconColor,
+      icon,
       order,
       status,
     } = req.body;
-
-    const indicatorIcon = fileUrl(req);
 
     const { rowCount } = await query(
       `UPDATE indicators SET
@@ -126,7 +123,7 @@ export const updateIndicator = async (req, res, next) => {
          status         = COALESCE($10, status),
          updated_at     = NOW()
        WHERE id = $1`,
-      [id, sectorId, categoryId, name, hoverTitle, cardColor, iconColor, indicatorIcon, order, status],
+      [id, sectorId, categoryId, name, hoverTitle, cardColor, iconColor, icon, order, status],
     );
     if (!rowCount) return res.status(404).json({ success: false, message: 'Indicator not found' });
 

@@ -1,5 +1,4 @@
 import { query } from '../config/db.js';
-import { fileUrl } from '../middlewares/upload.js';
 
 const SELECT = `
   SELECT id,
@@ -9,7 +8,7 @@ const SELECT = `
          category_slug  AS "categorySlug",
          card_color     AS "cardColor",
          icon_color     AS "iconColor",
-         category_icon  AS "categoryIcon",
+         category_icon  AS "icon",
          display_status AS "displayStatus",
          display_order  AS "order",
          status,
@@ -53,6 +52,7 @@ export const createCategory = async (req, res, next) => {
       categorySlug,
       cardColor,
       iconColor,
+      icon,
       displayStatus = 'show',
       order = 0,
       status = 'active',
@@ -63,8 +63,6 @@ export const createCategory = async (req, res, next) => {
         .status(400)
         .json({ success: false, message: 'sectorId, name and categorySlug are required' });
     }
-
-    const categoryIcon = fileUrl(req);
 
     const { rows } = await query(
       `INSERT INTO categories
@@ -80,7 +78,7 @@ export const createCategory = async (req, res, next) => {
         categorySlug,
         cardColor,
         iconColor,
-        categoryIcon,
+        icon,
         displayStatus,
         order,
         status,
@@ -111,12 +109,11 @@ export const updateCategory = async (req, res, next) => {
       categorySlug,
       cardColor,
       iconColor,
+      icon,
       displayStatus,
       order,
       status,
     } = req.body;
-
-    const categoryIcon = fileUrl(req);
 
     const { rowCount } = await query(
       `UPDATE categories SET
@@ -142,7 +139,7 @@ export const updateCategory = async (req, res, next) => {
         categorySlug,
         cardColor,
         iconColor,
-        categoryIcon,
+        icon,
         displayStatus,
         order,
         status,

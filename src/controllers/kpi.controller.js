@@ -1,5 +1,4 @@
 import { query } from '../config/db.js';
-import { fileUrl } from '../middlewares/upload.js';
 
 const SELECT = `
   SELECT id,
@@ -14,7 +13,7 @@ const SELECT = `
          visualization_url AS "visualizationUrl",
          card_color        AS "cardColor",
          icon_color        AS "iconColor",
-         kpi_icon          AS "KpiIcon",
+         kpi_icon          AS "icon",
          value1, value2, value3,
          show_value1       AS "showValue1",
          show_value2       AS "showValue2",
@@ -97,6 +96,7 @@ export const createKpi = async (req, res, next) => {
       showValue2,
       showValue3,
       displayStatus = 'show',
+      icon,
       order = 0,
       status = 'active',
     } = req.body;
@@ -107,8 +107,6 @@ export const createKpi = async (req, res, next) => {
         message: 'sectorId, categoryId, indicatorId, name and kpiSlug are required',
       });
     }
-
-    const kpiIcon = fileUrl(req);
 
     const { rows } = await query(
       `INSERT INTO kpis
@@ -133,7 +131,7 @@ export const createKpi = async (req, res, next) => {
         visualizationUrl,
         cardColor,
         iconColor,
-        kpiIcon,
+        icon,
         value1,
         value2,
         value3,
@@ -184,12 +182,11 @@ export const updateKpi = async (req, res, next) => {
       showValue1,
       showValue2,
       showValue3,
+      icon,
       displayStatus,
       order,
       status,
     } = req.body;
-
-    const kpiIcon = fileUrl(req);
 
     const { rowCount } = await query(
       `UPDATE kpis SET
@@ -231,7 +228,7 @@ export const updateKpi = async (req, res, next) => {
         visualizationUrl,
         cardColor,
         iconColor,
-        kpiIcon,
+        icon,
         value1,
         value2,
         value3,
