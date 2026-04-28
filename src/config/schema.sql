@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS banners (
   banner_type   VARCHAR(50),
   banner_for    VARCHAR(50),
   redirect_url  TEXT,
+  image         TEXT,
   start_date    DATE,
   end_date      DATE,
   display_order INTEGER      NOT NULL DEFAULT 0,

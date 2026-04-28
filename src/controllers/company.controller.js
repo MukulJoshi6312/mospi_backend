@@ -14,10 +14,10 @@ const SELECT = `
   FROM companies
 `;
 
-// Pluck uploaded file URL from multer's req.files (null if the field wasn't sent).
+// Pluck uploaded S3 URL from multer-s3's req.files (null if the field wasn't sent).
 const pickFileUrl = (req, field) => {
   const f = req.files?.[field]?.[0];
-  return f ? `/uploads/${f.filename}` : null;
+  return f ? f.location : null;
 };
 
 // GET /api/companies
