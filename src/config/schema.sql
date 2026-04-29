@@ -29,10 +29,13 @@ CREATE TABLE IF NOT EXISTS companies (
   right_logo       TEXT,
   meta_title       VARCHAR(150) NOT NULL,
   meta_description TEXT         NOT NULL,
+  rich_content     JSONB,
   status           VARCHAR(20)  NOT NULL DEFAULT 'active',
   created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
   updated_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS rich_content JSONB;
 
 -- ============================================================================
 --  REFRESH TOKENS

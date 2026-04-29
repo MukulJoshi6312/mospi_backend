@@ -8,6 +8,7 @@ const SELECT = `
          right_logo        AS "rightLogo",
          meta_title        AS "metaTitle",
          meta_description  AS "metaDescription",
+         rich_content      AS "richContent",
          status,
          created_at        AS "createdAt",
          updated_at        AS "updatedAt"
@@ -18,6 +19,21 @@ const SELECT = `
 const pickFileUrl = (req, field) => {
   const f = req.files?.[field]?.[0];
   return f ? f.location : null;
+};
+
+// Normalize anything the client sends (object, array, JSON string, or raw HTML
+// string from a rich-text editor) into a value safe to cast as ::jsonb.
+// Returns `undefined` when the caller did not send the field at all.
+const toJsonbParam = (value) => {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  if (typeof value !== 'string') return JSON.stringify(value);
+  try {
+    JSON.parse(value);
+    return value; // already valid JSON
+  } catch {
+    return JSON.stringify(value); // wrap raw text/HTML as a JSON string
+  }
 };
 
 // GET /api/companies
@@ -50,6 +66,7 @@ export const createCompany = async (req, res, next) => {
       copyright,
       metaTitle,
       metaDescription,
+      richContent,
       status = 'active',
     } = req.body;
 
@@ -62,14 +79,15 @@ export const createCompany = async (req, res, next) => {
 
     const leftLogo = pickFileUrl(req, 'leftLogo');
     const rightLogo = pickFileUrl(req, 'rightLogo');
+    const richContentJson = toJsonbParam(richContent) ?? null;
 
     const { rows } = await query(
       `INSERT INTO companies
          (domain, company_name, copyright, left_logo, right_logo,
-          meta_title, meta_description, status)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+          meta_title, meta_description, rich_content, status)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9)
        RETURNING id`,
-      [domain, companyName, copyright, leftLogo, rightLogo, metaTitle, metaDescription, status],
+      [domain, companyName, copyright, leftLogo, rightLogo, metaTitle, metaDescription, richContentJson, status],
     );
 
     const created = await query(`${SELECT} WHERE id = $1`, [rows[0].id]);
@@ -89,11 +107,13 @@ export const updateCompany = async (req, res, next) => {
       copyright,
       metaTitle,
       metaDescription,
+      richContent,
       status,
     } = req.body;
 
     const leftLogo = pickFileUrl(req, 'leftLogo');
     const rightLogo = pickFileUrl(req, 'rightLogo');
+    const richContentJson = toJsonbParam(richContent) ?? null;
 
     const { rowCount } = await query(
       `UPDATE companies SET
@@ -104,10 +124,11 @@ export const updateCompany = async (req, res, next) => {
          right_logo       = COALESCE($6, right_logo),
          meta_title       = COALESCE($7, meta_title),
          meta_description = COALESCE($8, meta_description),
-         status           = COALESCE($9, status),
+         rich_content     = COALESCE($9::jsonb, rich_content),
+         status           = COALESCE($10, status),
          updated_at       = NOW()
        WHERE id = $1`,
-      [id, domain, companyName, copyright, leftLogo, rightLogo, metaTitle, metaDescription, status],
+      [id, domain, companyName, copyright, leftLogo, rightLogo, metaTitle, metaDescription, richContentJson, status],
     );
     if (!rowCount) return res.status(404).json({ success: false, message: 'Company not found' });
 
