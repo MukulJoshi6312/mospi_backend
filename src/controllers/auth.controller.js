@@ -4,6 +4,9 @@ import crypto from 'node:crypto';
 import { query } from '../config/db.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { fileUrl } from '../middlewares/upload.js';
+import { sendMail, passwordResetEmail } from '../utils/mailer.js';
+
+const RESET_TOKEN_TTL_MIN = Number(process.env.PASSWORD_RESET_TTL_MIN) || 15;
 
 // SELECT clause that maps DB columns → camelCase for the user response.
 const USER_FIELDS = `
@@ -310,6 +313,140 @@ export const changePassword = asyncHandler(async (req, res) => {
   );
 
   res.json({ success: true, message: 'Password changed successfully' });
+});
+
+// POST /api/auth/forgot-password — body: { email }
+// Always returns 200 with a generic message so attackers can't enumerate
+// which emails exist. Mail is only actually sent when the user exists.
+export const forgotPassword = asyncHandler(async (req, res) => {
+  const email = (req.body.email || '').trim().toLowerCase();
+  if (!email) {
+    return res.status(400).json({ success: false, message: 'email is required' });
+  }
+
+  const generic = {
+    success: true,
+    message: 'If that email is registered, a reset link has been sent.',
+  };
+
+  const { rows } = await query(
+    'SELECT id, name, email FROM users WHERE LOWER(email) = $1',
+    [email],
+  );
+  const user = rows[0];
+  if (!user) return res.json(generic);
+
+  // Invalidate any previous still-valid reset tokens for this user — only
+  // the latest link should work.
+  await query(
+    `UPDATE password_reset_tokens
+        SET used_at = NOW()
+      WHERE user_id = $1 AND used_at IS NULL AND expires_at > NOW()`,
+    [user.id],
+  );
+
+  const rawToken = crypto.randomBytes(32).toString('hex'); // 64 chars
+  const tokenHash = sha256(rawToken);
+  const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MIN * 60_000);
+
+  await query(
+    `INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
+     VALUES ($1, $2, $3)`,
+    [user.id, tokenHash, expiresAt],
+  );
+
+  const base = process.env.FRONTEND_RESET_URL || 'http://localhost:5173/reset-password';
+  const resetUrl = `${base.replace(/\/+$/, '')}/${rawToken}`;
+
+  try {
+    const mail = passwordResetEmail({
+      name: user.name,
+      resetUrl,
+      expiresMinutes: RESET_TOKEN_TTL_MIN,
+    });
+    await sendMail({ to: user.email, ...mail });
+  } catch (err) {
+    console.error('Failed to send reset email:', err);
+    return res
+      .status(500)
+      .json({ success: false, message: 'Could not send reset email. Try again later.' });
+  }
+
+  res.json(generic);
+});
+
+// GET /api/auth/reset-password/:token — frontend calls this when the user
+// lands on the reset page. 200 if the token is valid, 410 if expired/used.
+export const verifyResetToken = asyncHandler(async (req, res) => {
+  const { token } = req.params;
+  if (!token) {
+    return res.status(400).json({ success: false, message: 'token required' });
+  }
+
+  const { rows } = await query(
+    `SELECT id FROM password_reset_tokens
+      WHERE token_hash = $1
+        AND used_at IS NULL
+        AND expires_at > NOW()`,
+    [sha256(token)],
+  );
+  if (!rows[0]) {
+    return res
+      .status(410)
+      .json({ success: false, message: 'Reset link is invalid or has expired' });
+  }
+  res.json({ success: true, message: 'Token is valid' });
+});
+
+// POST /api/auth/reset-password — body: { token, newPassword }
+// Single-use: marks the token used in the same UPDATE that validates it,
+// so two concurrent requests can't both succeed.
+export const resetPassword = asyncHandler(async (req, res) => {
+  const { token, newPassword } = req.body;
+  if (!token || !newPassword) {
+    return res
+      .status(400)
+      .json({ success: false, message: 'token and newPassword are required' });
+  }
+  if (newPassword.length < 8) {
+    return res
+      .status(400)
+      .json({ success: false, message: 'New password must be at least 8 characters' });
+  }
+
+  const tokenHash = sha256(token);
+
+  // Atomically claim the token (set used_at) only if it's still valid.
+  const claim = await query(
+    `UPDATE password_reset_tokens
+        SET used_at = NOW()
+      WHERE token_hash = $1
+        AND used_at IS NULL
+        AND expires_at > NOW()
+      RETURNING user_id`,
+    [tokenHash],
+  );
+  if (!claim.rowCount) {
+    return res
+      .status(410)
+      .json({ success: false, message: 'Reset link is invalid or has expired' });
+  }
+
+  const userId = claim.rows[0].user_id;
+  const newHash = await bcrypt.hash(newPassword, 10);
+  await query('UPDATE users SET password = $2, updated_at = NOW() WHERE id = $1', [
+    userId,
+    newHash,
+  ]);
+
+  // Force re-login on every device.
+  await query(
+    `UPDATE refresh_tokens SET revoked_at = NOW()
+      WHERE user_id = $1 AND revoked_at IS NULL`,
+    [userId],
+  );
+
+  res.json({ success: true, message: 'Password has been reset. Please log in.' });
 });
 
 // Admin-only: list all users

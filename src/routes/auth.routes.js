@@ -7,6 +7,9 @@ import {
   me,
   updateProfile,
   changePassword,
+  forgotPassword,
+  verifyResetToken,
+  resetPassword,
   updateUserRole,
   listUsers,
 } from '../controllers/auth.controller.js';
@@ -22,6 +25,11 @@ router.post('/register', authLimiter, register);
 router.post('/login', authLimiter, login);
 router.post('/refresh', authLimiter, refresh);
 router.post('/logout', logout);
+
+// Forgot / reset password (public, rate-limited)
+router.post('/forgot-password', authLimiter, forgotPassword);
+router.get('/reset-password/:token', authLimiter, verifyResetToken);
+router.post('/reset-password', authLimiter, resetPassword);
 
 // Protected — any logged-in user (own profile)
 router.get('/me', protect, me);
