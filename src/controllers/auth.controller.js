@@ -316,25 +316,25 @@ export const changePassword = asyncHandler(async (req, res) => {
 });
 
 // POST /api/auth/forgot-password — body: { email }
-// Always returns 200 with a generic message so attackers can't enumerate
-// which emails exist. Mail is only actually sent when the user exists.
+// Returns 404 if the email is not registered so the frontend can show a
+// clear toast. NOTE: this enables email enumeration; revisit if the
+// STQC/CERT-In audit objects.
 export const forgotPassword = asyncHandler(async (req, res) => {
   const email = (req.body.email || '').trim().toLowerCase();
   if (!email) {
     return res.status(400).json({ success: false, message: 'email is required' });
   }
 
-  const generic = {
-    success: true,
-    message: 'If that email is registered, a reset link has been sent.',
-  };
-
   const { rows } = await query(
     'SELECT id, name, email FROM users WHERE LOWER(email) = $1',
     [email],
   );
   const user = rows[0];
-  if (!user) return res.json(generic);
+  if (!user) {
+    return res
+      .status(404)
+      .json({ success: false, message: 'This email is not registered' });
+  }
 
   // Invalidate any previous still-valid reset tokens for this user — only
   // the latest link should work.
@@ -372,7 +372,10 @@ export const forgotPassword = asyncHandler(async (req, res) => {
       .json({ success: false, message: 'Could not send reset email. Try again later.' });
   }
 
-  res.json(generic);
+  res.json({
+    success: true,
+    message: 'A password reset link has been sent to your email.',
+  });
 });
 
 // GET /api/auth/reset-password/:token — frontend calls this when the user
